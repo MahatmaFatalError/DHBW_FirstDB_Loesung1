@@ -23,29 +23,46 @@ public class RowPage extends AbstractPage {
 	}
 	
 	@Override
-	// Offset richtig als schreib-zeiger?
 	public int insert(AbstractRecord record){
 		//TODO: Implement this method
 		
-		byte[] recVal = new byte[slotSize];
+		byte[] recordValues = new byte[slotSize];
+		byte[] attributeValue = new byte[record.values.length];
 		
+				
 		if(recordFitsIntoPage(record)){
 			for (int i = 0; i < record.values.length; i++) {
-	            recVal = record.getValue(i).serialize();
+				attributeValue = record.getValue(i).serialize();
 				
-	            
-	            for (int j = 0; j < recVal.length; i++){
-	            	data[offset+j] = recVal[j];	
-	            }
-	            offset += recVal.length;
-				            
+				if(record.getValue(i).isFixedLength()){	//int
+					
+					for (int j = 0; j < attributeValue.length; i++){
+		            	data[offset+j] = attributeValue[j];	
+		            }
+		            offset += attributeValue.length;
+		            
+				} else {								//varchar
+					offsetEnd -= attributeValue.length;
+					
+					for (int j = 0; j < attributeValue.length; i++){
+		            	data[offsetEnd+j] = attributeValue[j];	
+		            }
+					
+					offsetEnd -= attributeValue.length;
+					
+					data[offset] = (byte) attributeValue.length;
+					data[++offset] = (byte) offsetEnd;
+					
+				}
+				numRecords++;
+				      
 	        }			
 			
 		} else{
-			//throw new Exception;
+			throw new IllegalArgumentException();
 		}		
 		
-		return offset;
+		return numRecords;
 	}
 	
 	@Override
@@ -53,28 +70,44 @@ public class RowPage extends AbstractPage {
 		//TODO: Implement this method
 		int readPos = slotSize*slotNumber;
 		
-		byte b = data[readPos];
+		byte[] byteValue = new byte[slotSize];	// = data[readPos];
 		byte[] tmp = new byte[1];
 		
 		//TODO: herausfinden, wie viele Attribute im Datensatz sind
+		
+		for (int i = 0; i < record.values.length; i++){	//woher weis ich denn, wie lang der scheiss value ist?
+			if(record.getValue(i).isFixedLength()){		//int lesen
+				SQLInteger sqlint = new SQLInteger();
+				
+				for (int j = 0; i < 4; j++){
+					byteValue[j] = data[readPos+j];
+				}		
+				
+				readPos += 4;
+				
+				sqlint.deserialize(byteValue);
+				
+				record.setValue(i, sqlint);
+				
+				
+			} else {									//varchar lesen
+				SQLVarchar sqlchar= new SQLVarchar(record.getVariableLength());
+				
+				int length = data[readPos];
+				int varOffset = data[++readPos]; 
+				
+				for(int j = 0; j < length; j++){
+					byteValue[j] = data[readPos+j];
+				}
+				
+				readPos += length;
+				
+				sqlchar.deserialize(byteValue);
+				
+				record.setValue(i, sqlchar);
+				
+			}
 			
-		if(record.getVariableLength()<0){	//Wenn fixed lengt => SQLInteger
-			SQLInteger sqlint = new SQLInteger();
-			
-			
-			tmp[0] = b;
-			
-			sqlint.deserialize(tmp);
-			record.setValue(0, sqlint);
-			
-		}else{ //else SQLVarchar
-			SQLVarchar sqlchar= new SQLVarchar(record.getVariableLength());
-			
-			tmp[0] = b;
-			
-			sqlchar.deserialize(tmp);
-			
-			record.setValue(0, sqlchar);
 		}
 		
 	}
