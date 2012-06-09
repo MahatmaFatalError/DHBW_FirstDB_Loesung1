@@ -19,6 +19,61 @@ public class RowPage extends AbstractPage {
 	public void insert(int slotNumber, AbstractRecord record, boolean doInsert) {
 		//TODO: Implement this method
 		
+		//byte[] recordValues = new byte[slotSize];
+		byte[] attributeValue = new byte[record.values.length];
+		
+		int writePos = slotNumber * slotSize;
+		
+		
+		//TODO: Alten Datensetz lesen, um varchars komplett zu loeschen	
+		//Record oldRecord = new Record();
+		//this.read(slotNumber, oldRecord);
+		
+		if(doInsert){
+			if(recordFitsIntoPage(record)){
+				
+			}
+						
+			//RowPage newPage = new RowPage(slotSize);
+			
+			
+			
+			
+		} else{
+			
+			for (int i = 0; i < record.values.length; i++) {
+				attributeValue = record.getValue(i).serialize();
+				
+				if(record.getValue(i).isFixedLength()){	//int					
+					
+					//Datensatz loeschen, Varchar values loeschen fehlt...
+					for (int j = 0; j < slotSize; i++){
+		            	data[writePos+j] = (byte) 0;	
+		            }
+					
+					//neuen 
+					for (int j = 0; j < attributeValue.length; j++){
+		            	data[writePos+j] = attributeValue[j];	
+		            }
+					writePos += attributeValue.length;
+		            
+				} else {								//varchar
+					offsetEnd -= attributeValue.length;
+					
+					for (int j = 0; j < attributeValue.length; j++){
+		            	data[offsetEnd+j] = attributeValue[j];	
+		            }
+					
+					offsetEnd -= attributeValue.length;
+					
+					data[writePos] = (byte) attributeValue.length;
+					data[++writePos] = (byte) offsetEnd;
+					
+				}
+			}
+		}
+		
+		
 		
 	}
 	
@@ -26,9 +81,8 @@ public class RowPage extends AbstractPage {
 	public int insert(AbstractRecord record){
 		//TODO: Implement this method
 		
-		byte[] recordValues = new byte[slotSize];
-		byte[] attributeValue = new byte[record.values.length];
 		
+		byte[] attributeValue = new byte[record.values.length];	
 				
 		if(recordFitsIntoPage(record)){
 			for (int i = 0; i < record.values.length; i++) {
@@ -36,7 +90,7 @@ public class RowPage extends AbstractPage {
 				
 				if(record.getValue(i).isFixedLength()){	//int
 					
-					for (int j = 0; j < attributeValue.length; i++){
+					for (int j = 0; j < attributeValue.length; j++){
 		            	data[offset+j] = attributeValue[j];	
 		            }
 		            offset += attributeValue.length;
@@ -44,7 +98,7 @@ public class RowPage extends AbstractPage {
 				} else {								//varchar
 					offsetEnd -= attributeValue.length;
 					
-					for (int j = 0; j < attributeValue.length; i++){
+					for (int j = 0; j < attributeValue.length; j++){
 		            	data[offsetEnd+j] = attributeValue[j];	
 		            }
 					
@@ -71,7 +125,6 @@ public class RowPage extends AbstractPage {
 		int readPos = slotSize*slotNumber;
 		
 		byte[] byteValue = new byte[slotSize];	// = data[readPos];
-		byte[] tmp = new byte[1];
 		
 		//TODO: herausfinden, wie viele Attribute im Datensatz sind
 		
@@ -79,7 +132,7 @@ public class RowPage extends AbstractPage {
 			if(record.getValue(i).isFixedLength()){		//int lesen
 				SQLInteger sqlint = new SQLInteger();
 				
-				for (int j = 0; i < 4; j++){
+				for (int j = 0; j < record.getValue(i).getFixedLength(); j++){
 					byteValue[j] = data[readPos+j];
 				}		
 				
@@ -97,10 +150,8 @@ public class RowPage extends AbstractPage {
 				int varOffset = data[++readPos]; 
 				
 				for(int j = 0; j < length; j++){
-					byteValue[j] = data[readPos+j];
+					byteValue[j] = data[varOffset+j];
 				}
-				
-				readPos += length;
 				
 				sqlchar.deserialize(byteValue);
 				
